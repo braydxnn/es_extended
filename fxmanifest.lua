@@ -1,31 +1,23 @@
-fx_version 'adamant'
-
+fx_version 'cerulean'
 game 'gta5'
-
-description 'ES Extended'
+description 'Overextended'
 
 version 'legacy'
 
 shared_scripts {
 	'locale.lua',
-	'locales/de.lua',
-	'locales/br.lua',
-	'locales/fr.lua',
 	'locales/en.lua',
-	'locales/fi.lua',
-	'locales/sv.lua',
-	'locales/pl.lua',
-	'locales/cs.lua',
-	'locales/sc.lua',
-	'locales/tc.lua',
 
 	'config.lua',
 	'config.weapons.lua',
+
+	'common/modules/math.lua',
+	'common/modules/table.lua',
+	'common/functions.lua'
 }
 
 server_scripts {
 	'@async/async.lua',
-	'@mysql-async/lib/MySQL.lua',
 
 	'server/common.lua',
 	'server/classes/player.lua',
@@ -33,10 +25,7 @@ server_scripts {
 	'server/paycheck.lua',
 	'server/main.lua',
 	'server/commands.lua',
-
-	'common/modules/math.lua',
-	'common/modules/table.lua',
-	'common/functions.lua'
+	'server/onesync.lua',
 }
 
 client_scripts {
@@ -49,10 +38,6 @@ client_scripts {
 	'client/modules/death.lua',
 	'client/modules/scaleform.lua',
 	'client/modules/streaming.lua',
-
-	'common/modules/math.lua',
-	'common/modules/table.lua',
-	'common/functions.lua'
 }
 
 ui_page {
@@ -79,7 +64,7 @@ files {
 }
 
 dependencies {
-	'mysql-async',
+	'oxmysql',
 	'async',
 	'spawnmanager',
 }

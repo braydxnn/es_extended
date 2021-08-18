@@ -34,19 +34,24 @@ end
 ------------------------------------------------------------------------
 if IsDuplicityVersion() then
 ------------------------------------------------------------------------
-	-- Clear out unneccesary garbage that gets copied over
-	ESX.Items, ESX.Jobs, ESX.UsableItemsCallbacks = {}, {}, {}
-	ESX.ServerCallbacks, ESX.CancelledTimeouts, ESX.RegisteredCommands = nil, nil, nil
 
 ------------------------------------------------------------------------
 else -- CLIENT
 ------------------------------------------------------------------------
+ESX.UI.Opened, ESX.UI.RegisteredTypes, ESX.PlayerData.inventory = nil, nil, {}
+
 	AddEventHandler('esx:setPlayerData', function(key, val, last)
 		if GetInvokingResource() == 'es_extended' then
 			ESX.PlayerData[key] = val
 			if OnPlayerData ~= nil then OnPlayerData(key, val, last) end
 		end
 	end)
+
+	ESX.CanPerformAction = function()
+		if ESX.PlayerData.cuffed or ESX.PlayerData.dead or ESX.PlayerData.handsup or ESX.PlayerData.busy then
+			return false
+		else return true end
+	end
 
 ------------------------------------------------------------------------
 end

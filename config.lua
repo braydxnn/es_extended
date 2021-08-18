@@ -1,4 +1,4 @@
-Config = {}
+ESX, Core, Config = {}, {}, {}
 Config.Locale = 'en'
 
 Config.Accounts = {
@@ -17,5 +17,5 @@ Config.EnableDebug              = false -- Use Debug options?
 Config.EnableWantedLevel    	= false -- Use Normal GTA wanted Level?
 Config.EnablePVP                = true -- Allow Player to player combat
 
-Config.Multichar                = true -- Enable support for esx_multicharacter
+Config.Multichar                = false -- Enable support for esx_multicharacter
 Config.Identity                 = true -- Select a characters identity data before they have loaded in (this happens by default with multichar)

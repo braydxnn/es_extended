@@ -46,7 +46,7 @@ Many more resources are included in this repository, or you can browse the [ESX 
 		- ESX.GetExtendedPlayers('group', 'admin')
 			
 #### Fixes
-- ESX.Jobs table is populated after all jobs are setup, allowing other resources to retrieve it if needed
+- Core.Jobs table is populated after all jobs are setup, allowing other resources to retrieve it if needed
 - All weapons are properly removed when using the clearloadout command
 ##### For creating or updating resources refer to the [updated boilerplate](/esx_example).
 

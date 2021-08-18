@@ -29,10 +29,10 @@ ESX.RegisterCommand = function(name, group, cb, allowConsole, suggestion)
 		return
 	end
 
-	if ESX.RegisteredCommands[name] then
+	if Core.RegisteredCommands[name] then
 		print(('[^3WARNING^7] Command ^5"%s" already registered, overriding command^0'):format(name))
 
-		if ESX.RegisteredCommands[name].suggestion then
+		if Core.RegisteredCommands[name].suggestion then
 			TriggerClientEvent('chat:removeSuggestion', -1, ('/%s'):format(name))
 		end
 	end
@@ -44,10 +44,10 @@ ESX.RegisterCommand = function(name, group, cb, allowConsole, suggestion)
 		TriggerClientEvent('chat:addSuggestion', -1, ('/%s'):format(name), suggestion.help, suggestion.arguments)
 	end
 
-	ESX.RegisteredCommands[name] = {group = group, cb = cb, allowConsole = allowConsole, suggestion = suggestion}
+	Core.RegisteredCommands[name] = {group = group, cb = cb, allowConsole = allowConsole, suggestion = suggestion}
 
 	RegisterCommand(name, function(playerId, args, rawCommand)
-		local command = ESX.RegisteredCommands[name]
+		local command = Core.RegisteredCommands[name]
 
 		if not command.allowConsole and playerId == 0 then
 			print(('[^3WARNING^7] ^5%s'):format(_U('commanderror_console')))
@@ -148,53 +148,39 @@ ESX.RegisterCommand = function(name, group, cb, allowConsole, suggestion)
 end
 
 ESX.ClearTimeout = function(id)
-	ESX.CancelledTimeouts[id] = true
+	Core.CancelledTimeouts[id] = true
 end
 
 ESX.RegisterServerCallback = function(name, cb)
-	ESX.ServerCallbacks[name] = cb
+	Core.ServerCallbacks[name] = cb
 end
 
 ESX.TriggerServerCallback = function(name, requestId, source, cb, ...)
-	if ESX.ServerCallbacks[name] then
-		ESX.ServerCallbacks[name](source, cb, ...)
+	if Core.ServerCallbacks[name] then
+		Core.ServerCallbacks[name](source, cb, ...)
 	else
-		print(('[^3WARNING^7] Server callback ^5"%s"^0 does not exist. ^1Please Check The Server File for Errors!'):format(name))
+		print(('[^3WARNING^7] Server callback ^5"%s"^0 does not exist. Please Check The Server File for Errors!'):format(name))
 	end
 end
 
-local savePlayers = -1
-MySQL.Async.store("UPDATE users SET `accounts` = ?, `job` = ?, `job_grade` = ?, `group` = ?, `position` = ?, `inventory` = ?, WHERE `identifier` = ?", function(storeId)
-	savePlayers = storeId
-end)
-
-ESX.SavePlayer = function(xPlayer, cb)
-	local asyncTasks = {}
-
-	table.insert(asyncTasks, function(cb2)
-		MySQL.Async.execute(savePlayers, {
-			json.encode(xPlayer.getAccounts(true)),
-			xPlayer.job.name,
-			xPlayer.job.grade,
-			xPlayer.getGroup(),
-			json.encode(xPlayer.getCoords()),
-			json.encode(xPlayer.getInventory(true)),
-			xPlayer.getIdentifier()
-		}, function(rowsChanged)
-			cb2()
-		end)
-	end)
-
-	Async.parallel(asyncTasks, function(results)
-		print(('[^2INFO^7] Saved player ^5"%s^7"'):format(xPlayer.getName()))
-
-		if cb then
-			cb()
+Core.SavePlayer = function(xPlayer, cb)
+	exports.oxmysql:execute("UPDATE users SET `accounts` = ?, `job` = ?, `job_grade` = ?, `group` = ?, `position` = ?, `inventory` = ? WHERE `identifier` = ?", {
+		json.encode(xPlayer.getAccounts(true)),
+		xPlayer.job.name,
+		xPlayer.job.grade,
+		xPlayer.group,
+		json.encode(xPlayer.getCoords()),
+		json.encode(xPlayer.getInventory(true)),
+		xPlayer.identifier
+	}, function(affectedRows)
+		if affectedRows == 1 then
+			print(('[^2INFO^7] Saved player ^5"%s^7"'):format(xPlayer.name))
 		end
+		if cb then cb() end
 	end)
 end
 
-ESX.SavePlayers = function(cb)
+Core.SavePlayers = function(cb)
 	local xPlayers = ESX.GetExtendedPlayers()
 	if #xPlayers > 0 then
 		local time = os.time()
@@ -218,7 +204,7 @@ ESX.SavePlayers = function(cb)
 				json.encode(xPlayer.getAccounts(true)),
 				xPlayer.job.name,
 				xPlayer.job.grade,
-				xPlayer.getGroup(),
+				xPlayer.group,
 				json.encode(xPlayer.getCoords()),
 				json.encode(xPlayer.getInventory(true))
 			)
@@ -228,10 +214,10 @@ ESX.SavePlayers = function(cb)
 
 		updateCommand = updateCommand .. ' ) vals ON u.identifier = vals.identifier SET accounts = new_accounts, job = new_job, job_grade = new_job_grade, `group` = new_group, `position` = new_position, inventory = new_inventory'
 
-		MySQL.Async.fetchAll(updateCommand, {},
-		function(result)
-			if result then
-				if cb then cb() else print(('[^2INFO^7] Saved %s of %s player(s) over %s seconds'):format(result.affectedRows, #xPlayers, os.time() - time)) end
+		exports.oxmysql:execute(updateCommand, {},
+		function(affectedRows)
+			if affectedRows > 0 then
+				if cb then cb() else print(('[^2INFO^7] Saved %s of %s player(s) over %s seconds'):format(affectedRows, #xPlayers, os.time() - time)) end
 			end
 		end)
 	end
@@ -240,7 +226,7 @@ end
 ESX.GetPlayers = function()
 	local sources = {}
 
-	for k,v in pairs(ESX.Players) do
+	for k,v in pairs(Core.Players) do
 		table.insert(sources, k)
 	end
 
@@ -249,7 +235,7 @@ end
 
 ESX.GetExtendedPlayers = function(key, val)
 	local xPlayers = {}
-	for k, v in pairs(ESX.Players) do
+	for k, v in pairs(Core.Players) do
 		if key then
 			if (key == 'job' and v.job.name == val) or v[key] == val then
 				table.insert(xPlayers, v)
@@ -262,11 +248,11 @@ ESX.GetExtendedPlayers = function(key, val)
 end
 
 ESX.GetPlayerFromId = function(source)
-	return ESX.Players[tonumber(source)]
+	return Core.Players[source]
 end
 
 ESX.GetPlayerFromIdentifier = function(identifier)
-	for k,v in pairs(ESX.Players) do
+	for k,v in pairs(Core.Players) do
 		if v.identifier == identifier then
 			return v
 		end
@@ -276,8 +262,7 @@ end
 ESX.GetIdentifier = function(playerId)
 	for k,v in ipairs(GetPlayerIdentifiers(playerId)) do
 		if string.match(v, 'license:') then
-			local identifier = string.gsub(v, 'license:', '')
-			return identifier
+			return string.gsub(v, 'license:', '')
 		end
 	end
 end
@@ -298,21 +283,22 @@ ESX.GetItemLabel = function(item)
 end
 
 ESX.GetJobs = function()
-	return ESX.Jobs
+	return Core.Jobs
 end
 
 ESX.GetUsableItems = function()
-	return ESX.UsableItemsCallbacks
+	local Usables = {}
+	for k, v in pairs(Core.UsableItemsCallbacks) do
+		Usables[k] = true
+	end
+	return Usables
 end
 
 ESX.DoesJobExist = function(job, grade)
-	grade = tostring(grade)
-
 	if job and grade then
-		if ESX.Jobs[job] and ESX.Jobs[job].grades[grade] then
+		if Core.Jobs[job] and Core.Jobs[job].grades[grade] then
 			return true
 		end
 	end
-
 	return false
 end

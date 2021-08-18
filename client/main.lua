@@ -1,6 +1,6 @@
-Citizen.CreateThread(function()
+CreateThread(function()
 	while not Config.Multichar do
-		Citizen.Wait(0)
+		Wait(0)
 		if NetworkIsPlayerActive(PlayerId()) then
 			exports.spawnmanager:setAutoSpawn(false)
 			DoScreenFadeOut(0)
@@ -10,15 +10,14 @@ Citizen.CreateThread(function()
 	end
 end)
 
-RegisterNetEvent('esx:playerLoaded')
-AddEventHandler('esx:playerLoaded', function(xPlayer, isNew, skin)
+RegisterNetEvent('esx:playerLoaded', function(xPlayer, isNew, skin)
 	ESX.PlayerLoaded = true
 	ESX.PlayerData = xPlayer
 
 	FreezeEntityPosition(PlayerPedId(), true)
 
 	if Config.Multichar then
-		Citizen.Wait(3000)
+		Wait(3000)
 	else
 		exports.spawnmanager:spawnPlayer({
 			x = ESX.PlayerData.coords.x,
@@ -31,7 +30,6 @@ AddEventHandler('esx:playerLoaded', function(xPlayer, isNew, skin)
 			TriggerServerEvent('esx:onPlayerSpawn')
 			TriggerEvent('esx:onPlayerSpawn')
 			TriggerEvent('playerSpawned') -- compatibility with old scripts
-			TriggerEvent('esx:restoreLoadout')
 			if isNew then
 				if skin.sex == 0 then
 					TriggerEvent('skinchanger:loadDefaultModel', true)
@@ -46,7 +44,7 @@ AddEventHandler('esx:playerLoaded', function(xPlayer, isNew, skin)
 		end)
 	end
 
-	while ESX.PlayerData.ped == nil do Citizen.Wait(20) end
+	while ESX.PlayerData.ped == nil do Wait(20) end
 	-- enable PVP
 	if Config.EnablePVP then
 		SetCanAttackFriendly(ESX.PlayerData.ped, true, false)
@@ -69,11 +67,23 @@ AddEventHandler('esx:playerLoaded', function(xPlayer, isNew, skin)
 			grade_label = gradeLabel
 		})
 	end
-	StartServerSyncLoops()
+	local previousCoords = vector3(ESX.PlayerData.coords.x, ESX.PlayerData.coords.y, ESX.PlayerData.coords.z)
+	SetInterval(1, 2000, function()
+		local playerCoords = GetEntityCoords(ESX.PlayerData.ped)
+		local distance = #(playerCoords - previousCoords)
+		if distance > 4 then
+			previousCoords = playerCoords
+			TriggerServerEvent('esx:updateCoords', {
+				x = ESX.Math.Round(playerCoords.x, 1),
+				y = ESX.Math.Round(playerCoords.y, 1),
+				z = ESX.Math.Round(playerCoords.z, 1),
+				heading = ESX.Math.Round(GetEntityHeading(ESX.PlayerData.ped), 1)
+			})
+		end
+	end)
 end)
 
-RegisterNetEvent('esx:onPlayerLogout')
-AddEventHandler('esx:onPlayerLogout', function()
+RegisterNetEvent('esx:onPlayerLogout', function()
 	ESX.PlayerLoaded = false
 	if Config.EnableHud then ESX.UI.HUD.Reset() end
 end)
@@ -88,8 +98,7 @@ AddEventHandler('esx:onPlayerDeath', function()
 	ESX.SetPlayerData('dead', true)
 end)
 
-RegisterNetEvent('esx:setAccountMoney')
-AddEventHandler('esx:setAccountMoney', function(account)
+RegisterNetEvent('esx:setAccountMoney', function(account)
 	for k,v in ipairs(ESX.PlayerData.accounts) do
 		if v.name == account.name then
 			ESX.PlayerData.accounts[k] = account
@@ -105,13 +114,11 @@ AddEventHandler('esx:setAccountMoney', function(account)
 	end
 end)
 
-RegisterNetEvent('esx:teleport')
-AddEventHandler('esx:teleport', function(coords)
+RegisterNetEvent('esx:teleport', function(coords)
 	ESX.Game.Teleport(ESX.PlayerData.ped, coords)
 end)
 
-RegisterNetEvent('esx:setJob')
-AddEventHandler('esx:setJob', function(Job)
+RegisterNetEvent('esx:setJob', function(Job)
 	if Config.EnableHud then
 		local gradeLabel = Job.grade_label ~= Job.label and Job.grade_label or ''
 		if gradeLabel ~= '' then gradeLabel = ' - '..gradeLabel end
@@ -123,8 +130,7 @@ AddEventHandler('esx:setJob', function(Job)
 	ESX.SetPlayerData('job', Job)
 end)
 
-RegisterNetEvent('esx:spawnVehicle')
-AddEventHandler('esx:spawnVehicle', function(vehicle)
+RegisterNetEvent('esx:spawnVehicle', function(vehicle)
 	local model = (type(vehicle) == 'number' and vehicle or GetHashKey(vehicle))
 
 	if IsModelInCdimage(model) then
@@ -138,8 +144,7 @@ AddEventHandler('esx:spawnVehicle', function(vehicle)
 	end
 end)
 
-RegisterNetEvent('esx:registerSuggestions')
-AddEventHandler('esx:registerSuggestions', function(registeredCommands)
+RegisterNetEvent('esx:registerSuggestions', function(registeredCommands)
 	for name,command in pairs(registeredCommands) do
 		if command.suggestion then
 			TriggerEvent('chat:addSuggestion', ('/%s'):format(name), command.suggestion.help, command.suggestion.arguments)
@@ -147,8 +152,7 @@ AddEventHandler('esx:registerSuggestions', function(registeredCommands)
 	end
 end)
 
-RegisterNetEvent('esx:deleteVehicle')
-AddEventHandler('esx:deleteVehicle', function(radius)
+RegisterNetEvent('esx:deleteVehicle', function(radius)
 	if radius and tonumber(radius) then
 		radius = tonumber(radius) + 0.01
 		local vehicles = ESX.Game.GetVehiclesInArea(GetEntityCoords(ESX.PlayerData.ped), radius)
@@ -157,7 +161,7 @@ AddEventHandler('esx:deleteVehicle', function(radius)
 			local attempt = 0
 
 			while not NetworkHasControlOfEntity(entity) and attempt < 100 and DoesEntityExist(entity) do
-				Citizen.Wait(100)
+				Wait(100)
 				NetworkRequestControlOfEntity(entity)
 				attempt = attempt + 1
 			end
@@ -174,7 +178,7 @@ AddEventHandler('esx:deleteVehicle', function(radius)
 		end
 
 		while not NetworkHasControlOfEntity(vehicle) and attempt < 100 and DoesEntityExist(vehicle) do
-			Citizen.Wait(100)
+			Wait(100)
 			NetworkRequestControlOfEntity(vehicle)
 			attempt = attempt + 1
 		end
@@ -187,10 +191,10 @@ end)
 
 -- Pause menu disables HUD display
 if Config.EnableHud then
-	Citizen.CreateThread(function()
+	CreateThread(function()
 		local isPaused = false
 		while true do
-			Citizen.Wait(300)
+			Wait(300)
 
 			if IsPauseMenuActive() and not isPaused then
 				isPaused = true
@@ -204,31 +208,6 @@ if Config.EnableHud then
 
 	AddEventHandler('esx:loadingScreenOff', function()
 		ESX.UI.HUD.SetDisplay(1.0)
-	end)
-end
-
-function StartServerSyncLoops()
-	-- sync current player coords with server
-	Citizen.CreateThread(function()
-		local previousCoords = vector3(ESX.PlayerData.coords.x, ESX.PlayerData.coords.y, ESX.PlayerData.coords.z)
-
-		while ESX.PlayerLoaded do
-			local playerPed = PlayerPedId()
-			if ESX.PlayerData.ped ~= playerPed then ESX.SetPlayerData('ped', playerPed) end
-
-			if DoesEntityExist(ESX.PlayerData.ped) then
-				local playerCoords = GetEntityCoords(ESX.PlayerData.ped)
-				local distance = #(playerCoords - previousCoords)
-
-				if distance > 1 then
-					previousCoords = playerCoords
-					local playerHeading = ESX.Math.Round(GetEntityHeading(ESX.PlayerData.ped), 1)
-					local formattedCoords = {x = ESX.Math.Round(playerCoords.x, 1), y = ESX.Math.Round(playerCoords.y, 1), z = ESX.Math.Round(playerCoords.z, 1), heading = playerHeading}
-					TriggerServerEvent('esx:updateCoords', formattedCoords)
-				end
-			end
-			Citizen.Wait(1500)
-		end
 	end)
 end
 

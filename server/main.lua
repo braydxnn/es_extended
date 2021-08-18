@@ -1,31 +1,19 @@
-local NewPlayer, LoadPlayer = -1, -1
-Citizen.CreateThread(function()
+local NewPlayer, LoadPlayer
+CreateThread(function()
 	SetMapName('San Andreas')
 	SetGameType('ESX Legacy')
 
-	local query = '`accounts`, `job`, `job_grade`, `group`, `position`, `inventory`, `skin`' -- Select these fields from the database
-	if Config.Multichar or Config.Identity then	-- append these fields to the select query
-		query = query..', `firstname`, `lastname`, `dateofbirth`, `sex`, `height`'
-	end
+	local query = '`accounts`, `job`, `job_grade`, `group`, `position`, `inventory`, `skin`'
+	if Config.Multichar or Config.Identity then query = query..', `firstname`, `lastname`, `dateofbirth`, `sex`, `height`' end
+	LoadPlayer = "SELECT "..query.." FROM users WHERE identifier = ?"
 
-	if Config.Multichar then -- insert identity data with creation
-		MySQL.Async.store("INSERT INTO `users` SET `accounts` = ?, `identifier` = ?, `group` = ?, `firstname` = ?, `lastname` = ?, `dateofbirth` = ?, `sex` = ?, `height` = ?", function(storeId)
-			NewPlayer = storeId
-		end)
-	else
-		MySQL.Async.store("INSERT INTO `users` SET `accounts` = ?, `identifier` = ?, `group` = ?", function(storeId)
-			NewPlayer = storeId
-		end)
-	end
-
-	MySQL.Async.store("SELECT "..query.." FROM `users` WHERE identifier = ?", function(storeId)
-		LoadPlayer = storeId
-	end)
+	if Config.Multichar then NewPlayer = "INSERT INTO users SET `accounts` = ?, `identifier` = ?, `group` = ?, `firstname` = ?, `lastname` = ?, `dateofbirth` = ?, `sex` = ?, `height` = ?"
+	else NewPlayer = "INSERT INTO users SET `accounts` = ?, `identifier` = ?, `group` = ?" end
 end)
 
 if Config.Multichar then
 	AddEventHandler('esx:onPlayerJoined', function(src, char, data)
-		if not ESX.Players[src] then
+		if not Core.Players[src] then
 			local identifier = char..':'..ESX.GetIdentifier(src)
 			if data then
 				createESXPlayer(identifier, src, data)
@@ -35,9 +23,8 @@ if Config.Multichar then
 		end
 	end)
 else
-	RegisterNetEvent('esx:onPlayerJoined')
-	AddEventHandler('esx:onPlayerJoined', function()
-		if not ESX.Players[source] then
+	RegisterNetEvent('esx:onPlayerJoined', function()
+		if not Core.Players[source] then
 			onPlayerJoined(source)
 		end
 	end)
@@ -49,8 +36,8 @@ function onPlayerJoined(playerId)
 		if ESX.GetPlayerFromIdentifier(identifier) then
 			DropPlayer(playerId, ('there was an error loading your character!\nError code: identifier-active-ingame\n\nThis error is caused by a player on this server who has the same identifier as you have. Make sure you are not playing on the same Rockstar account.\n\nYour Rockstar identifier: %s'):format(identifier))
 		else
-			MySQL.Async.fetchScalar('SELECT 1 FROM users WHERE identifier = @identifier', {
-				['@identifier'] = identifier
+			exports.oxmysql:scalar('SELECT 1 FROM users WHERE identifier = ?', {
+				identifier
 			}, function(result)
 				if result then
 					loadESXPlayer(identifier, playerId, false)
@@ -77,23 +64,23 @@ function createESXPlayer(identifier, playerId, data)
 	end
 
 	if not Config.Multichar then
-		MySQL.Async.execute(NewPlayer, {
-				json.encode(accounts),
-				identifier,
-				defaultGroup,
+		exports.oxmysql:execute(NewPlayer, {
+			json.encode(accounts),
+			identifier,
+			defaultGroup,
 		}, function(rowsChanged)
 			loadESXPlayer(identifier, playerId, true)
 		end)
 	else
-		MySQL.Async.execute(NewPlayer, {
-				json.encode(accounts),
-				identifier,
-				defaultGroup,
-				data.firstname,
-				data.lastname,
-				data.dateofbirth,
-				data.sex,
-				data.height,
+		exports.oxmysql:execute(NewPlayer, {
+			json.encode(accounts),
+			identifier,
+			defaultGroup,
+			data.firstname,
+			data.lastname,
+			data.dateofbirth,
+			data.sex,
+			data.height,
 		}, function(rowsChanged)
 			loadESXPlayer(identifier, playerId, true)
 		end)
@@ -104,7 +91,7 @@ AddEventHandler('playerConnecting', function(name, setCallback, deferrals)
 	deferrals.defer()
 	local playerId = source
 	local identifier = ESX.GetIdentifier(playerId)
-	Citizen.Wait(100)
+	Wait(100)
 
 	if identifier then
 		if ESX.GetPlayerFromIdentifier(identifier) then
@@ -128,10 +115,10 @@ function loadESXPlayer(identifier, playerId, isNew)
 	}
 
 	table.insert(tasks, function(cb)
-		MySQL.Async.fetchAll(LoadPlayer, { identifier
+		exports.oxmysql:fetch(LoadPlayer, { identifier
 		}, function(result)
-			local job, grade, jobObject, gradeObject = result[1].job, tostring(result[1].job_grade)
-			local foundAccounts = {}
+			local foundAccounts, job, grade, jobObject, gradeObject = {}, result[1].job, result[1].job_grade
+			local Player = Player(playerId).state
 
 			-- Accounts
 			if result[1].accounts and result[1].accounts ~= '' then
@@ -152,18 +139,18 @@ function loadESXPlayer(identifier, playerId, isNew)
 
 			-- Job
 			if ESX.DoesJobExist(job, grade) then
-				jobObject, gradeObject = ESX.Jobs[job], ESX.Jobs[job].grades[grade]
+				jobObject, gradeObject = Core.Jobs[job], Core.Jobs[job].grades[grade]
 			else
 				print(('[^3WARNING^7] Ignoring invalid job for %s [job: %s, grade: %s]'):format(identifier, job, grade))
-				job, grade = 'unemployed', '0'
-				jobObject, gradeObject = ESX.Jobs[job], ESX.Jobs[job].grades[grade]
+				job, grade = 'unemployed', 1
+				jobObject, gradeObject = Core.Jobs[job], Core.Jobs[job].grades[grade]
 			end
 
 			userData.job.id = jobObject.id
 			userData.job.name = jobObject.name
 			userData.job.label = jobObject.label
 
-			userData.job.grade = tonumber(grade)
+			userData.job.grade = grade
 			userData.job.grade_name = gradeObject.name
 			userData.job.grade_label = gradeObject.label
 			userData.job.grade_salary = gradeObject.salary
@@ -211,13 +198,23 @@ function loadESXPlayer(identifier, playerId, isNew)
 				if result[1].height then userData.height = result[1].height end
 			end
 
+			-- Statebags
+			Player.firstName = userData.firstname
+			Player.lastName = userData.lastname
+			Player.name = userData.firstname and userData.firstname..' '..userData.lastname or userData.playerName
+			Player.job = jobObject.label
+			Player.grade = gradeObject.label
+			Player.cuffed = false
+			Player.busy = false
+			Player.dead = false
+
 			cb()
 		end)
 	end)
 
 	Async.parallel(tasks, function(results)
 		local xPlayer = CreateExtendedPlayer(playerId, identifier, userData.group, userData.accounts, userData.job, userData.playerName, userData.coords)
-		ESX.Players[playerId] = xPlayer
+		Core.Players[playerId] = xPlayer
 
 		if userData.firstname then
 			xPlayer.set('firstName', userData.firstname)
@@ -240,7 +237,7 @@ function loadESXPlayer(identifier, playerId, isNew)
 		}, isNew, userData.skin)
 
 		TriggerEvent('ox_inventory:setPlayerInventory', xPlayer, userData.inventory)
-		xPlayer.triggerEvent('esx:registerSuggestions', ESX.RegisteredCommands)
+		xPlayer.triggerEvent('esx:registerSuggestions', Core.RegisteredCommands)
 		print(('[^2INFO^0] Player ^5"%s" ^0has connected to the server. ID: ^5%s^7'):format(xPlayer.getName(), playerId))
 	end)
 end
@@ -260,8 +257,8 @@ AddEventHandler('playerDropped', function(reason)
 	if xPlayer then
 		TriggerEvent('esx:playerDropped', playerId, reason)
 
-		ESX.SavePlayer(xPlayer, function()
-			ESX.Players[playerId] = nil
+		Core.SavePlayer(xPlayer, function()
+			Core.Players[playerId] = nil
 		end)
 	end
 end)
@@ -272,16 +269,15 @@ if Config.Multichar then
 		if xPlayer then
 			TriggerEvent('esx:playerDropped', playerId, reason)
 
-			ESX.SavePlayer(xPlayer, function()
-				ESX.Players[playerId] = nil
+			Core.SavePlayer(xPlayer, function()
+				Core.Players[playerId] = nil
 			end)
 		end
 		TriggerClientEvent("esx:onPlayerLogout", playerId)
 	end)
 end
 
-RegisterNetEvent('esx:updateCoords')
-AddEventHandler('esx:updateCoords', function(coords)
+RegisterNetEvent('esx:updateCoords', function(coords)
 	local xPlayer = ESX.GetPlayerFromId(source)
 
 	if xPlayer then
@@ -331,9 +327,12 @@ end)
 
 AddEventHandler('txAdmin:events:scheduledRestart', function(eventData)
 	if eventData.secondsRemaining == 60 then
-		Citizen.CreateThread(function()
-			Citizen.Wait(50000)
-			ESX.SavePlayers()
+		CreateThread(function()
+			Wait(50000)
+			Core.SavePlayers()
 		end)
 	end
 end)
+
+Core.StartPayCheck()
+print('[^2INFO^7] ESX ^5Legacy^0 initialized')

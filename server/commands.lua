@@ -20,6 +20,8 @@ end, true, {help = _U('command_setjob'), validate = true, arguments = {
 
 ESX.RegisterCommand('car', 'admin', function(xPlayer, args, showError)
 	if not args.car then args.car = "baller2" end
+	local vehicle = GetVehiclePedIsIn(GetPlayerPed(xPlayer.source))
+	if vehicle then DeleteEntity(vehicle) end
 	xPlayer.triggerEvent('esx:spawnVehicle', args.car)
 end, false, {help = _U('command_car'), validate = false, arguments = {
 	{name = 'car', help = _U('command_car_car'), type = 'any'}
@@ -49,13 +51,13 @@ end, true, {help = _U('command_setgroup'), validate = true, arguments = {
 }})
 
 ESX.RegisterCommand('save', 'admin', function(xPlayer, args, showError)
-	ESX.SavePlayer(args.playerId)
+	Core.SavePlayer(args.playerId)
 end, true, {help = _U('command_save'), validate = true, arguments = {
 	{name = 'playerId', help = _U('commandgeneric_playerid'), type = 'player'}
 }})
 
 ESX.RegisterCommand('saveall', 'admin', function(xPlayer, args, showError)
-	ESX.SavePlayers()
+	Core.SavePlayers()
 end, true, {help = _U('command_saveall')})
 
 ESX.RegisterCommand('group', {"user", "admin"}, function(xPlayer, args, showError)
@@ -91,16 +93,20 @@ end, true, {help = _U('bring'), validate = true, arguments = {
 }})
 
 ESX.RegisterCommand('reviveall', "admin", function(xPlayer, args, showError)
-	for _, playerId in ipairs(ESX.GetPlayers()) do
+	for _, playerId in ipairs(Core.GetPlayers()) do
 		TriggerClientEvent('esx_ambulancejob:revive', playerId)
 	end
 end, false)
 
 ESX.RegisterCommand('players', "admin", function(xPlayer, args, showError)
-	local xAll = ESX.GetPlayers()
+	local xAll = Core.GetPlayers()
 	print("^5"..#xAll.." ^2online player(s)^0")
 	for i=1, #xAll, 1 do
 		local xPlayer = ESX.GetPlayerFromId(xAll[i])
 		print("^1[ ^2ID : ^5"..xPlayer.source.." ^0| ^2Name : ^5"..xPlayer.getName().." ^0 | ^2Group : ^5"..xPlayer.getGroup().." ^0 | ^2Identifier : ^5".. xPlayer.identifier .."^1]^0\n")
 	end
+end, true)
+
+ESX.RegisterCommand({'loadjobs'}, 'admin', function(xPlayer, args, showError)
+	Core.LoadJobs()
 end, true)
