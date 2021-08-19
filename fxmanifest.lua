@@ -17,8 +17,6 @@ shared_scripts {
 }
 
 server_scripts {
-	'@async/async.lua',
-
 	'server/common.lua',
 	'server/classes/player.lua',
 	'server/functions.lua',
@@ -65,7 +63,6 @@ files {
 
 dependencies {
 	'oxmysql',
-	'async',
 	'spawnmanager',
 }
 

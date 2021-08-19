@@ -105,114 +105,105 @@ AddEventHandler('playerConnecting', function(name, setCallback, deferrals)
 end)
 
 function loadESXPlayer(identifier, playerId, isNew)
-	local tasks = {}
-
 	local userData = {
 		accounts = {},
 		inventory = {},
 		job = {},
 		playerName = GetPlayerName(playerId)
 	}
+	exports.oxmysql:fetch(LoadPlayer, { identifier
+	}, function(result)
+		local foundAccounts, job, grade, jobObject, gradeObject = {}, result[1].job, result[1].job_grade
+		local Player = Player(playerId).state
 
-	table.insert(tasks, function(cb)
-		exports.oxmysql:fetch(LoadPlayer, { identifier
-		}, function(result)
-			local foundAccounts, job, grade, jobObject, gradeObject = {}, result[1].job, result[1].job_grade
-			local Player = Player(playerId).state
+		-- Accounts
+		if result[1].accounts and result[1].accounts ~= '' then
+			local accounts = json.decode(result[1].accounts)
 
-			-- Accounts
-			if result[1].accounts and result[1].accounts ~= '' then
-				local accounts = json.decode(result[1].accounts)
-
-				for account,money in pairs(accounts) do
-					foundAccounts[account] = money
-				end
+			for account,money in pairs(accounts) do
+				foundAccounts[account] = money
 			end
+		end
 
-			for account,label in pairs(Config.Accounts) do
-				table.insert(userData.accounts, {
-					name = account,
-					money = foundAccounts[account] or Config.StartingAccountMoney[account] or 0,
-					label = label
-				})
-			end
+		for account,label in pairs(Config.Accounts) do
+			table.insert(userData.accounts, {
+				name = account,
+				money = foundAccounts[account] or Config.StartingAccountMoney[account] or 0,
+				label = label
+			})
+		end
 
-			-- Job
-			if ESX.DoesJobExist(job, grade) then
-				jobObject, gradeObject = Core.Jobs[job], Core.Jobs[job].grades[grade]
-			else
-				print(('[^3WARNING^7] Ignoring invalid job for %s [job: %s, grade: %s]'):format(identifier, job, grade))
-				job, grade = 'unemployed', 1
-				jobObject, gradeObject = Core.Jobs[job], Core.Jobs[job].grades[grade]
-			end
+		-- Job
+		if ESX.DoesJobExist(job, grade) then
+			jobObject, gradeObject = Core.Jobs[job], Core.Jobs[job].grades[grade]
+		else
+			print(('[^3WARNING^7] Ignoring invalid job for %s [job: %s, grade: %s]'):format(identifier, job, grade))
+			job, grade = 'unemployed', 1
+			jobObject, gradeObject = Core.Jobs[job], Core.Jobs[job].grades[grade]
+		end
 
-			userData.job.id = jobObject.id
-			userData.job.name = jobObject.name
-			userData.job.label = jobObject.label
+		userData.job.id = jobObject.id
+		userData.job.name = jobObject.name
+		userData.job.label = jobObject.label
 
-			userData.job.grade = grade
-			userData.job.grade_name = gradeObject.name
-			userData.job.grade_label = gradeObject.label
-			userData.job.grade_salary = gradeObject.salary
+		userData.job.grade = grade
+		userData.job.grade_name = gradeObject.name
+		userData.job.grade_label = gradeObject.label
+		userData.job.grade_salary = gradeObject.salary
 
-			userData.job.skin_male = {}
-			userData.job.skin_female = {}
+		userData.job.skin_male = {}
+		userData.job.skin_female = {}
 
-			if gradeObject.skin_male then userData.job.skin_male = json.decode(gradeObject.skin_male) end
-			if gradeObject.skin_female then userData.job.skin_female = json.decode(gradeObject.skin_female) end
+		if gradeObject.skin_male then userData.job.skin_male = json.decode(gradeObject.skin_male) end
+		if gradeObject.skin_female then userData.job.skin_female = json.decode(gradeObject.skin_female) end
 
-			-- Inventory
-			if result[1].inventory and result[1].inventory ~= '' then
-				userData.inventory = json.decode(result[1].inventory)
-			end
+		-- Inventory
+		if result[1].inventory and result[1].inventory ~= '' then
+			userData.inventory = json.decode(result[1].inventory)
+		end
 
-			-- Group
-			if result[1].group then
-				userData.group = result[1].group
-			else
-				userData.group = 'user'
-			end
+		-- Group
+		if result[1].group then
+			userData.group = result[1].group
+		else
+			userData.group = 'user'
+		end
 
-			-- Position
-			if result[1].position and result[1].position ~= '' then
-				userData.coords = json.decode(result[1].position)
-			else
-				print('[^3WARNING^7] Column ^5"position"^0 in ^5"users"^0 table is missing required default value. Using backup coords, fix your database.')
-				userData.coords = {x = -269.4, y = -955.3, z = 31.2, heading = 205.8}
-			end
+		-- Position
+		if result[1].position and result[1].position ~= '' then
+			userData.coords = json.decode(result[1].position)
+		else
+			print('[^3WARNING^7] Column ^5"position"^0 in ^5"users"^0 table is missing required default value. Using backup coords, fix your database.')
+			userData.coords = {x = -269.4, y = -955.3, z = 31.2, heading = 205.8}
+		end
 
-			-- Skin
-			if result[1].skin and result[1].skin ~= '' then
-				userData.skin = json.decode(result[1].skin)
-			else
-				if userData.sex == 'f' then userData.skin = {sex=1} else userData.skin = {sex=0} end
-			end
+		-- Skin
+		if result[1].skin and result[1].skin ~= '' then
+			userData.skin = json.decode(result[1].skin)
+		else
+			if userData.sex == 'f' then userData.skin = {sex=1} else userData.skin = {sex=0} end
+		end
 
-			-- Identity
-			if result[1].firstname and result[1].firstname ~= '' then
-				userData.firstname = result[1].firstname
-				userData.lastname = result[1].lastname
-				userData.playerName = userData.firstname..' '..userData.lastname
-				if result[1].dateofbirth then userData.dateofbirth = result[1].dateofbirth end
-				if result[1].sex then userData.sex = result[1].sex end
-				if result[1].height then userData.height = result[1].height end
-			end
+		-- Identity
+		if result[1].firstname and result[1].firstname ~= '' then
+			userData.firstname = result[1].firstname
+			userData.lastname = result[1].lastname
+			userData.playerName = userData.firstname..' '..userData.lastname
+			if result[1].dateofbirth then userData.dateofbirth = result[1].dateofbirth end
+			if result[1].sex then userData.sex = result[1].sex end
+			if result[1].height then userData.height = result[1].height end
+		end
 
-			-- Statebags
-			Player.firstName = userData.firstname
-			Player.lastName = userData.lastname
-			Player.name = userData.firstname and userData.firstname..' '..userData.lastname or userData.playerName
-			Player.job = jobObject.label
-			Player.grade = gradeObject.label
-			Player.cuffed = false
-			Player.busy = false
-			Player.dead = false
+		-- Statebags
+		Player.firstName = userData.firstname
+		Player.lastName = userData.lastname
+		Player.name = userData.firstname and userData.firstname..' '..userData.lastname or userData.playerName
+		Player.job = jobObject.label
+		Player.grade = gradeObject.label
+		Player.cuffed = false
+		Player.busy = false
+		Player.dead = false
 
-			cb()
-		end)
-	end)
-
-	Async.parallel(tasks, function(results)
 		local xPlayer = CreateExtendedPlayer(playerId, identifier, userData.group, userData.accounts, userData.job, userData.playerName, userData.coords)
 		Core.Players[playerId] = xPlayer
 
